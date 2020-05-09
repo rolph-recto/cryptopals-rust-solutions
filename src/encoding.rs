@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{ops::Deref, fmt};
 
 pub type Bytes = Vec<u8>;
 
@@ -126,6 +126,14 @@ impl Decodable for Hex {
     }
 }
 
+impl Deref for Hex {
+    type Target = String;
+
+    fn deref(&self) -> &String {
+        &self.0
+    }
+}
+
 impl fmt::Display for Hex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)
@@ -205,6 +213,14 @@ impl Decodable for Base64 {
         }
 
         decoded_bytes
+    }
+}
+
+impl Deref for Base64 {
+    type Target = String;
+
+    fn deref(&self) -> &String {
+        &self.0
     }
 }
 
