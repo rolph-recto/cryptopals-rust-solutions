@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests{
-    use crate::encoding::{Hex, Base64};
+    use crate::encoding::*;
     use std::collections::HashMap;
     use std::fs;
 
@@ -20,7 +20,8 @@ mod tests{
         let buf1: Hex = Hex::new("1c0111001f010100061a024b53535009181c");
         let buf2: Hex = Hex::new("686974207468652062756c6c277320657965");
         let expected: &str = "746865206b696420646f6e277420706c6179";
-        let result: Hex = buf1.xor(&buf2);
+        let xored_bytes: Bytes = xor_bytes(&buf1.decode(), &buf2.decode());
+        let result: Hex = Hex::encode(&xored_bytes);
 
         assert_eq!(expected, *result);
     }
@@ -66,28 +67,6 @@ mod tests{
         }
 
         return ciphertext;
-    }
-
-    // make a map of character counts
-    fn make_char_count_map(s: &str) -> HashMap<char, u32> {
-        let mut char_freq_map: HashMap<char, u32> = HashMap::new();
-        for c in s.chars().filter(|c: &char| c.is_ascii_alphabetic()) {
-            if !char_freq_map.contains_key(&c) {
-                char_freq_map.insert(c, 1);
-
-            } else {
-                char_freq_map.insert(c, char_freq_map.get(&c).unwrap() + 1);
-            }
-        }
-
-        return char_freq_map;
-    }
-
-    fn make_char_freq_map(len: usize, count_map: &HashMap<char, u32>) -> HashMap<char, f64> {
-        count_map
-            .iter()
-            .map(|(c, n)| (*c, (*n as f64) / (len as f64)))
-            .collect()
     }
 
     // assumption: characters are independent samples from the distribution defined by english_letter_freq

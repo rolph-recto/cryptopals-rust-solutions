@@ -6,6 +6,20 @@ pub trait Decodable {
     fn decode(&self) -> Bytes;
 }
 
+// XOR two byte vectors
+pub fn xor_bytes(buf1: &Bytes, buf2: &Bytes) -> Bytes {
+    if buf1.len() != buf2.len() {
+        panic!("xor_bytes: cannot XOR two byte vectors with different lengths");
+    }
+
+    let mut result: Bytes = Vec::new();
+    for i in 0..buf1.len() {
+        result.push(buf1[i] ^ buf2[i]);
+    }
+
+    return result;
+}
+
 pub struct Hex(String);
 
 impl Hex {
@@ -32,23 +46,6 @@ impl Hex {
         }
 
         return Self::new(&hex_string);
-    }
-
-    // XOR two hex strings
-    pub fn xor(&self, buf2: &Hex) -> Hex {
-        if self.0.len() != buf2.0.len() {
-            panic!("hex_xor: cannot XOR two hex strings with different lengths");
-        }
-
-        let hex1: Vec<u8> = self.decode();
-        let hex2: Vec<u8> = buf2.decode();
-
-        let mut hex_result: Vec<u8> = Vec::new();
-        for i in 0..hex1.len() {
-            hex_result.push(hex1[i] ^ hex2[i]);
-        }
-
-        return Self::encode(&hex_result);
     }
 
     // convert hex into base64
