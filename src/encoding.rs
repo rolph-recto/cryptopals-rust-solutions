@@ -1,228 +1,133 @@
 use std::{ops::Deref, fmt};
 
-pub type Bytes = Vec<u8>;
-
-pub trait Decodable {
-    fn decode(&self) -> Bytes;
-}
-
 // XOR two byte vectors
-pub fn xor_bytes(buf1: &Bytes, buf2: &Bytes) -> Bytes {
+pub fn xor_bytes(buf1: &str, buf2: &str) -> String {
     if buf1.len() != buf2.len() {
         panic!("xor_bytes: cannot XOR two byte vectors with different lengths");
     }
 
-    let mut result: Bytes = Vec::new();
+    let bytes1 = buf1.as_bytes();
+    let bytes2 = buf2.as_bytes();
+    let mut result: String = String::new();
     for i in 0..buf1.len() {
-        result.push(buf1[i] ^ buf2[i]);
+        result.push((bytes1[i] ^ bytes2[i]) as char);
     }
 
     return result;
 }
 
-pub struct Hex(String);
+pub fn hex_char(b: u8) -> char {
+    let val =
+        if b <= 9 {
+            b + 48
 
-impl Hex {
-    pub fn new(s: &str) -> Hex {
-        Hex(s.to_string())
-    }
+        } else if 10 <= b && b <= 15 {
+            b + 87
 
-    pub fn encode(bytes: &Bytes) -> Self {
-        let mut hex_string: String = String::new();
-        for &b in bytes.iter() {
-            let encoded_char: u8 =
-                if b <= 9 {
-                    b + 48
+        } else {
+            panic!("invalid hex-encoded byte {}", b);
+        };
+    val as char
+}
 
-                } else if 10 <= b && b <= 15 {
-                    b + 87
+pub fn hex_val(c: char) -> u8 {
+    let c_ascii = c as u8;
+    return if 48 <= c_ascii && c_ascii <= 57 {
+        c_ascii - 48
 
-                } else {
-                    panic!("invalid hex-encoded byte with index {}", b)
-                }
-            ;
+    } else if 97 <= c_ascii && c_ascii <= 102 {
+        c_ascii - 97 + 10
 
-            hex_string.push(encoded_char as char);
-        }
-
-        return Self::new(&hex_string);
-    }
-
-    // convert hex into base64
-    pub fn to_base64(&self) -> Base64 {
-        // since hex values are 4 bits wide and base64 values are 6 bits wide
-        // we can only encode 2 base64 bytes for every 3 hex bytes.
-        // thus the total number of hex bytes must be divisible by 3
-        if self.0.len() % 3 != 0 {
-            panic!("hex-encoded value cannot be converted to base64: {}", self.0)
-        }
-
-        let decoded_bytes: Vec<u8> = self.decode();
-
-        // encode 2 base64 bytes at a time
-        let mut b64_bytes: Vec<u8> = Vec::new();
-        for i in 0..(decoded_bytes.len()/3) {
-            let b: usize = i*3;
-
-            // first byte
-            let b64_byte1 = (decoded_bytes[b] << 2) | ((decoded_bytes[b+1] & 0b00001100) >> 2);
-
-            // second byte
-            let b64_byte2: u8 = ((decoded_bytes[b+1] & 0b00000011) << 4) | decoded_bytes[b+2];
-
-            b64_bytes.push(b64_byte1);
-            b64_bytes.push(b64_byte2);
-        }
-
-        // encode to base64
-        return Base64::encode(&b64_bytes);
-    }
-
-    // convert to an ASCII-encoded string
-    pub fn to_ascii(&self) -> String {
-        if self.0.len() % 2 != 0 {
-            panic!("hex string length must be divisible by 2 to convert to ascii");
-        }
-
-        let hex_bytes: Vec<u8> = self.decode();
-        let mut ascii_string: String = String::new();
-        for i in 0..hex_bytes.len()/2 {
-            let b: usize = i * 2;
-            let ascii_byte: u8 = ((hex_bytes[b] << 4) & 0b11110000) | hex_bytes[b+1];
-            ascii_string.push(ascii_byte as char);
-        }
-
-        return ascii_string;
+    } else {
+        panic!("invalid hex-encoded byte {}", c);
     }
 }
 
-impl Decodable for Hex {
-    // decode hex bytes from a string
-    fn decode(&self) -> Bytes {
-        let mut decoded_bytes: Bytes = Vec::new();
-
-        // decode from ASCII
-        let s_bytes = self.0.as_bytes();
-        for &val in s_bytes.iter() {
-            let decoded_val =
-                if 48 <= val && val <= 57 { // 0-9
-                    val - 48
-
-                } else if 97 <= val && val <= 102 { // a-f
-                    val - 87
-
-                } else {
-                    panic!("invalid hex-encoded char: {}", val as char)
-                }
-            ;
-
-            decoded_bytes.push(decoded_val);
-        }
-
-        decoded_bytes
+pub fn hex_to_ascii_str(str: &str) -> String {
+    if str.len() % 2 != 0 {
+        panic!("hex string length must be divisible by 2 to convert to ascii");
     }
+
+    let str_bytes = str.as_bytes();
+    let mut ascii_string: String = String::new();
+    for i in 0..str_bytes.len()/2 {
+        let b: usize = i * 2;
+        let hex_val1 = hex_val(str_bytes[b] as char);
+        let hex_val2 = hex_val(str_bytes[b+1] as char);
+        let ascii_byte: u8 = ((hex_val1 << 4) & 0b11110000) | hex_val2;
+        ascii_string.push(ascii_byte as char);
+    }
+
+    return ascii_string;
 }
 
-impl Deref for Hex {
-    type Target = String;
-
-    fn deref(&self) -> &String {
-        &self.0
+pub fn ascii_to_hex_str(str: &str) -> String {
+    let str_bytes = str.as_bytes();
+    let mut hex_string: String = String::new();
+    for i in 0..str_bytes.len() {
+        let hex_char_upper: char = hex_char((str_bytes[i] & 0b11110000) >> 4);
+        let hex_char_lower: char = hex_char(str_bytes[i] & 0b00001111);
+        hex_string.push(hex_char_upper);
+        hex_string.push(hex_char_lower);
     }
+
+    return hex_string;
 }
 
-impl fmt::Display for Hex {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
+
+pub fn base64_char(b: u8) -> char {
+    let val =
+        if b <= 25 { // A-Z
+            b + 65
+
+        } else if 26 <= b && b <= 51 { // a-z
+            b + 71
+
+        } else if 52 <= b && b <= 61 { // 0-9
+            b - 4 
+
+        } else if b == 62 { // +
+            43
+
+        } else if b == 63 { // /
+            47
+
+        } else {
+            panic!("invalid base64-encoded byte {}", b)
+        };
+    val as char
 }
 
-pub struct Base64(String);
-
-impl Base64 {
-    pub fn new(s: &str) -> Self {
-        Base64(s.to_string())
+pub fn hex_to_base64(str: &str) -> String {
+    // since hex values are 4 bits wide and base64 values are 6 bits wide
+    // we can only encode 2 base64 bytes for every 3 hex bytes.
+    // thus the total number of hex bytes must be divisible by 3
+    if str.len() % 3 != 0 {
+        panic!("hex-encoded value cannot be converted to base64: {}", str);
     }
 
-    // encode base64 string from bytes
-    pub fn encode(bytes: &Bytes) -> Base64 {
-        let mut b64_string: String = String::new();
-        for &b in bytes.iter() {
-            // A-Z
-            let encoded_char: u8 =
-                if b <= 25 { // A-Z
-                    b + 65
+    let str_bytes = str.as_bytes();
 
-                } else if 26 <= b && b <= 51 { // a-z
-                    b + 71
+    // encode 2 base64 bytes at a time
+    let mut b64_str: String = String::new();
+    for i in 0..(str_bytes.len()/3) {
+        let b: usize = i*3;
 
-                } else if 52 <= b && b <= 61 { // 0-9
-                    b - 4 
+        let hex_val1 = hex_val(str_bytes[b] as char);
+        let hex_val2 = hex_val(str_bytes[b+1] as char);
+        let hex_val3 = hex_val(str_bytes[b+2] as char);
 
-                } else if b == 62 { // +
-                    43
+        // first char
+        let b64_char1 = base64_char((hex_val1 << 2) | ((hex_val2 & 0b00001100) >> 2));
 
-                } else if b == 63 { // /
-                    47
+        // second char
+        let b64_char2 = base64_char(((hex_val2 & 0b00000011) << 4) | hex_val3);
 
-                } else {
-                    panic!("invalid base64-encoded byte with index {}", b)
-                }
-            ;
-            
-            b64_string.push(encoded_char as char);
-        }
-
-        return Self(b64_string);
+        b64_str.push(b64_char1);
+        b64_str.push(b64_char2);
     }
-}
 
-impl Decodable for Base64 {
-    // decode base64 bytes from a string
-    fn decode(&self) -> Bytes {
-        let mut decoded_bytes: Vec<u8> = Vec::new();
+    // encode to base64
+    return b64_str;
 
-        // decode from ASCII
-        let s_bytes: &[u8] = self.0.as_bytes();
-        for &val in s_bytes.iter() {
-            let decoded_val: u8 =
-                if 65 <= val && val <= 90 { // A-Z
-                    val - 65
-
-                } else if 97 <= val && val <= 122 { // a-z
-                    val - 97 + 26
-
-                } else if 48 <= val && val <= 57 {
-                    val - 48 + 52
-
-                } else if val == 43 {
-                    62
-
-                } else if val == 47 {
-                    63
-
-                } else {
-                    panic!("invalid base64-encoded char: {}", val as char)
-                }
-            ;
-
-            decoded_bytes.push(decoded_val);
-        }
-
-        decoded_bytes
-    }
-}
-
-impl Deref for Base64 {
-    type Target = String;
-
-    fn deref(&self) -> &String {
-        &self.0
-    }
-}
-
-impl fmt::Display for Base64 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
 }

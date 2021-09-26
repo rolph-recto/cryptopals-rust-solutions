@@ -7,23 +7,19 @@ mod tests{
     // set 1 challenge 1: convert hex to base64
     #[test]
     fn set1_challenge1() {
-        let s: Hex = Hex::new("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d");
-        let expected: &str = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
-        let result: Base64 = s.to_base64();
-
-        assert_eq!(expected, *result);
+        let result = hex_to_base64("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d");
+        assert_eq!(result, "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t");
     }
 
     // set 1 challenge 2: XOR two hex buffers
     #[test]
     fn set1_challenge2() {
-        let buf1: Hex = Hex::new("1c0111001f010100061a024b53535009181c");
-        let buf2: Hex = Hex::new("686974207468652062756c6c277320657965");
+        let buf1: String = hex_to_ascii_str("1c0111001f010100061a024b53535009181c");
+        let buf2: String = hex_to_ascii_str("686974207468652062756c6c277320657965");
         let expected: &str = "746865206b696420646f6e277420706c6179";
-        let xored_bytes: Bytes = xor_bytes(&buf1.decode(), &buf2.decode());
-        let result: Hex = Hex::encode(&xored_bytes);
+        let xored_bytes: String = ascii_to_hex_str(&xor_bytes(&buf1, &buf2));
 
-        assert_eq!(expected, *result);
+        assert_eq!(expected, xored_bytes);
     }
 
     fn get_english_letter_freq() -> HashMap<char, f64> {
@@ -59,7 +55,7 @@ mod tests{
     }
 
     // encrypt ascii text with a 1-byte key
-    fn xor_single_char_cipher(s: &str, k: char) -> String {
+    fn xor_single_char(s: &str, k: char) -> String {
         let mut ciphertext: String = String::new();
 
         for c in s.chars() {
@@ -85,14 +81,13 @@ mod tests{
     #[test]
     fn set1_challenge3() {
         let english_letter_freq = get_english_letter_freq();
-        let s: Hex = Hex::new("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736");
-        let s_ascii: String = s.to_ascii();
+        let s: String = hex_to_ascii_str("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736");
 
         let mut best_score: f64 = 0.0;
         let mut best_plaintext: String = "".to_string();
 
         for k in 0u8..255 {
-            let plaintext: String = xor_single_char_cipher(&s_ascii, k as char);
+            let plaintext: String = xor_single_char(&s, k as char);
             let score: f64 = plaintext_score(&english_letter_freq, &plaintext.to_ascii_lowercase());
 
             if score > best_score {
@@ -114,9 +109,9 @@ mod tests{
         let mut best_score: f64 = 0.0;
         let mut best_plaintext: String = String::new();
         for line in filestr.lines() {
-            let line_ascii: String = Hex::new(line).to_ascii();
+            let line_ascii: String = hex_to_ascii_str(line);
             for k in 0u8..255 {
-                let plaintext: String = xor_single_char_cipher(&line_ascii, k as char).trim().to_string();
+                let plaintext: String = xor_single_char(&line_ascii, k as char).trim().to_string();
                 let score: f64 = plaintext_score(&english_letter_freq, &plaintext.to_ascii_lowercase());
 
                 if score > best_score {
@@ -127,5 +122,32 @@ mod tests{
         }
 
         assert_eq!("Now that the party is jumping", best_plaintext);
+    }
+
+    // encrypt ascii text with a 1-byte key
+    fn xor_repeating_key(plaintext: &str, key: &str) -> String {
+        let key_bytes = key.as_bytes();
+        let key_len = key_bytes.len();
+        let mut ciphertext: String = String::new();
+        let mut i: usize = 0;
+
+        for c in plaintext.chars() {
+            let key_i: usize = i % key_len;
+            let key_char: char = key_bytes[key_i] as char;
+            ciphertext.push(((c as u8) ^ (key_char as u8)) as char);
+            i += 1;
+        }
+
+        println!("key: {}; key_len: {};  ciphertext: {}", key, key_len, ciphertext);
+
+        return ciphertext;
+    }
+
+    #[test]
+    fn set1_challenge5() {
+        let line = "Burning 'em, if you ain't quick and nimble\nI go crazy when I hear a cymbal";
+        let ciphertext=  ascii_to_hex_str(&xor_repeating_key(line, "ICE"));
+
+        assert_eq!(ciphertext, "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f");
     }
 }
