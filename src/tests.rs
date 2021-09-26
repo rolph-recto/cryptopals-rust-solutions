@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests{
     use crate::encoding::*;
+    use bitvec::prelude::*;
     use std::collections::HashMap;
     use std::fs;
 
@@ -149,5 +150,24 @@ mod tests{
         let ciphertext=  ascii_to_hex_str(&xor_repeating_key(line, "ICE"));
 
         assert_eq!(ciphertext, "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f");
+    }
+
+    fn hamming_distance(str1: &str, str2: &str) -> u64 {
+        let bits1 = str1.as_bytes().view_bits::<Msb0>();
+        let bits2 = str2.as_bytes().view_bits::<Msb0>();
+
+        let mut biter2 = bits2.iter();
+        let mut count = 0;
+        for b1 in bits1.iter() {
+            let xor = *b1 ^ *(biter2.next().expect("hamming_distance: strings have to be same length"));
+            count += if xor { 1 } else { 0 };
+        }
+        return count;
+    }
+
+    #[test]
+    fn set1_challenge6() {
+        let d = hamming_distance("this is a test", "wokka wokka!!!");
+        assert_eq!(d, 37);
     }
 }
