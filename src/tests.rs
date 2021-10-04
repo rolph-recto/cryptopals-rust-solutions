@@ -3,7 +3,22 @@ mod tests{
     use crate::encoding::*;
     use bitvec::prelude::*;
     use std::collections::HashMap;
-    use std::fs;
+    use std::fs::{self, File};
+    use std::io::{self, BufRead};
+    use std::path::Path;
+
+    fn read_lines<P>(filename: P) -> io::Result<String>
+    where P: AsRef<Path>, {
+        let file = File::open(filename)?;
+
+        let mut s = String::new();
+        for line in io::BufReader::new(file).lines() {
+            if let Ok(ip) = line {
+                s.push_str(&ip)
+            }
+        }
+        Ok(s)
+    }
 
     // set 1 challenge 1: convert hex to base64
     #[test]
@@ -152,9 +167,9 @@ mod tests{
         assert_eq!(ciphertext, "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f");
     }
 
-    fn hamming_distance(str1: &str, str2: &str) -> u64 {
-        let bits1 = str1.as_bytes().view_bits::<Msb0>();
-        let bits2 = str2.as_bytes().view_bits::<Msb0>();
+    fn hamming_distance(str1: &[u8], str2: &[u8]) -> u64 {
+        let bits1 = str1.view_bits::<Msb0>();
+        let bits2 = str2.view_bits::<Msb0>();
 
         let mut biter2 = bits2.iter();
         let mut count = 0;
@@ -166,8 +181,72 @@ mod tests{
     }
 
     #[test]
-    fn set1_challenge6() {
-        let d = hamming_distance("this is a test", "wokka wokka!!!");
+    fn test_hamming() {
+        let d = hamming_distance("this is a test".as_bytes(), "wokka wokka!!!".as_bytes());
         assert_eq!(d, 37);
+    }
+
+    // calculate the average Hamming distance given a specific window size
+    fn window_hamming_distance(s: &[u8], size: usize) -> f64 {
+        let mut i: usize = 0;
+        let mut d: u64 = 0;
+        while (i+2)*size < s.len() {
+            let frame1 = &s[(i*size) .. (i+1)*size];
+            let frame2 = &s[(i+1)*size .. (i+2)*size];
+            d += hamming_distance(frame1, frame2);
+            i += 1;
+        }
+
+        return (d as f64) / (s.len() as f64);
+    }
+
+    #[test]
+    fn set1_challenge6() {
+        // load file and decode from base64
+        let filestr: String =
+            base64_to_ascii_str(
+                &read_lines("6.txt")
+                .expect("cannot read 6.txt")
+            );
+
+        // find keysize
+        let filebytes = filestr.as_bytes();
+        let mut best_d = window_hamming_distance(filebytes, 1);
+        let mut best_key_size: usize = 1;
+        for window_size in 2 .. 50 {
+            let d = window_hamming_distance(filebytes, window_size);
+            if d < best_d {
+                best_d = d;
+                best_key_size = window_size;
+            }
+        }
+
+        // arrange blocks to find individual characters of key
+        // e.g. if key is length 3, arrange bytes 1, 4, 7, ... into one block;
+        // arrange bytes 2, 5, 8, ... into another block; and so on
+        let english_letter_freq = get_english_letter_freq();
+        let mut blocks = vec![String::new(); best_key_size];
+        for i in 0 .. filebytes.len() {
+            blocks[i % best_key_size].push(filebytes[i] as char);
+        }
+
+        let mut key = String::new();
+        for i in 0 .. best_key_size {
+            let mut best_score: f64 = 0.0;
+            let mut best_char: char = ' ';
+            for k in 0u8..255 {
+                let plaintext: String = xor_single_char(&blocks[i], k as char);
+                let score: f64 = plaintext_score(&english_letter_freq, &plaintext.to_ascii_lowercase());
+
+                if score > best_score {
+                    best_score = score;
+                    best_char = k as char;
+                }
+            }
+
+            key.push(best_char as char);
+        }
+
+        assert_eq!(key, "Terminator X: Bring the noise");
     }
 }
