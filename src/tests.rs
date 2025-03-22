@@ -32,8 +32,11 @@ mod tests{
     fn set1_challenge2() {
         let buf1: String = hex_to_ascii_str("1c0111001f010100061a024b53535009181c");
         let buf2: String = hex_to_ascii_str("686974207468652062756c6c277320657965");
+        let out = xor_bytes(&buf1.as_bytes(), &buf2.as_bytes());
+        let str_out = String::from_utf8(out).unwrap();
+
         let expected: &str = "746865206b696420646f6e277420706c6179";
-        let xored_bytes: String = ascii_to_hex_str(&xor_bytes(&buf1, &buf2));
+        let xored_bytes: String = ascii_to_hex_str(&str_out);
 
         assert_eq!(expected, xored_bytes);
     }

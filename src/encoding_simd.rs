@@ -1,19 +1,42 @@
 use std::{ops::Deref, fmt};
+use std::simd::{Simd, SupportedLaneCount, LaneCount};
 
 const BASE64_PADDING_VAL: u8 = 255;
 
 // XOR two byte vectors
-pub fn xor_bytes(buf1: &[u8], buf2: &[u8]) -> Vec<u8> {
+pub fn xor_bytes<const N: usize>(buf1: &[u8], buf2: &[u8]) -> Vec<u8>
+where LaneCount<N>: SupportedLaneCount
+{
     if buf1.len() != buf2.len() {
         panic!("xor_bytes: cannot XOR two byte vectors with different lengths");
     }
 
-    let mut result: Vec<u8> = Vec::new();
-    for i in 0..buf1.len() {
-        result.push(buf1[i] ^ buf2[i]);
+    let mut chunks1 = buf1.chunks_exact(N);
+    let mut chunks2 = buf2.chunks_exact(N);
+
+    let mut out: Vec<u8> = Vec::with_capacity(buf1.len());
+    let mut out_ptr = out.as_mut_ptr();
+
+    let mut cur_size = 0;
+    for (chunk1, chunk2) in (&mut chunks1).zip(&mut chunks2) {
+        let chunk_res = Simd::<u8,N>::from_slice(chunk1) ^ Simd::<u8,N>::from_slice(chunk2);
+
+        unsafe {
+            out_ptr.cast::<Simd<u8,N>>().write_unaligned(chunk_res);
+            out_ptr = out_ptr.add(N);
+        }
+        cur_size += N;
     }
 
-    return result;
+    unsafe {
+        out.set_len(cur_size);
+    }
+
+    for (b1, b2) in chunks1.remainder().into_iter().zip(chunks2.remainder()) {
+        out.push(b1 ^ b2);
+    }
+
+    return out;
 }
 
 pub fn hex_char(b: u8) -> char {
@@ -211,7 +234,7 @@ mod test {
 
         let mut n: usize = 0;
         for _ in 0..500 {
-            let res = xor_bytes(&bytes1, &bytes2);
+            let res = xor_bytes::<64>(&bytes1, &bytes2);
             n += res.len();
         }
     }
